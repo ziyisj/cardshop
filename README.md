@@ -155,6 +155,53 @@ docker pull ghcr.io/ziyisj/cardshop:latest
 `.github/workflows/ci.yml` 会在每次 push / PR 时：安装依赖、连一个 MySQL 服务、
 跑 `migrate --seed`，确保应用可正常引导。
 
+---
+
+## 数据库自动备份
+
+Docker 部署已内置 `backup` 服务：用 cron 定时 `mysqldump`，压缩后存到 Docker 卷
+`db_backups`，并自动清理过期备份。**开箱即用，默认每天 03:00 备份、保留 7 天。**
+
+### 配置（在 `.env` 中）
+
+```env
+BACKUP_CRON=0 3 * * *      # cron 表达式（默认每天 03:00）
+BACKUP_KEEP_DAYS=7         # 本地保留天数
+BACKUP_ON_START=false      # 容器启动时是否立即备份一次
+TZ=Asia/Shanghai
+```
+
+### 常用操作
+
+```bash
+# 查看已有备份
+docker compose exec backup ls -lh /backups
+
+# 立即手动备份一次
+docker compose exec backup sh /usr/local/bin/backup.sh
+
+# 恢复某个备份（会覆盖现有数据，有 5 秒确认窗口）
+docker compose exec backup sh /usr/local/bin/restore.sh /backups/cardshop_20260101_030000.sql.gz
+
+# 把备份从容器复制到宿主机
+docker compose cp backup:/backups ./db_backups
+```
+
+### 可选：上传到 S3 兼容对象存储
+
+在 `.env` 填入以下变量，备份完成后会自动上传（支持 AWS S3、阿里云 OSS、
+MinIO、Backblaze B2 等 S3 兼容服务）：
+
+```env
+S3_BUCKET=my-backup-bucket
+S3_ENDPOINT=https://s3.example.com   # AWS 官方可留空
+S3_ACCESS_KEY=xxx
+S3_SECRET_KEY=xxx
+S3_REGION=us-east-1
+```
+
+> 备份数据很重要，建议至少配置 S3 或定期把 `db_backups` 卷同步到异地。
+
 ### 不用 Docker（宿主机直装）
 
 已装 PHP 8.1+ / Composer / MySQL 时：
