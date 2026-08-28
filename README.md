@@ -91,6 +91,31 @@ chmod +x deploy.sh
 
 > 也可直接用原生 compose：`docker compose up -d --build`
 
+### 使用预构建镜像（GitHub Actions 自动发布到 GHCR）
+
+推送到 `main` 或打 `v*.*.*` tag 时，GitHub Actions 会自动构建镜像并发布到
+GitHub Container Registry：`ghcr.io/ziyisj/cardshop`。
+
+拉取并直接运行（无需本地构建）：
+
+```bash
+docker pull ghcr.io/ziyisj/cardshop:latest
+```
+
+如需在 compose 中使用预构建镜像，把 `app` 服务的 `build:` 换成：
+
+```yaml
+  app:
+    image: ghcr.io/ziyisj/cardshop:latest
+```
+
+> 私有仓库的镜像默认私有，拉取前需 `docker login ghcr.io`（用 GitHub 用户名 + PAT）。
+
+### CI
+
+`.github/workflows/ci.yml` 会在每次 push / PR 时：安装依赖、连一个 MySQL 服务、
+跑 `migrate --seed`，确保应用可正常引导。
+
 ### 不用 Docker（宿主机直装）
 
 已装 PHP 8.1+ / Composer / MySQL 时：
