@@ -1,11 +1,28 @@
 # CardShop — 授权校验 + 发卡系统
 
-基于 **Laravel 10 + MySQL** 的一体化系统，包含三大模块：
+基于 **Laravel 12 + MySQL** 的一体化系统，包含三大模块：
 
 1. **登录 + 有效期校验 API**（供你的 C/C++ 程序调用，含 HMAC 签名防篡改、时间戳防重放、机器码绑定）
 2. **卡密系统**（生成 / 激活 / 续期）
 3. **发卡网站前台**（商品展示 / 下单 / 自动发货）
 4. **管理后台**（账号 / 卡密 / 商品 / 订单）
+
+---
+
+## 🚀 全新 Linux 服务器一键部署
+
+在一台**全新的 Linux 服务器**上，只需执行下面**一行命令**（自动安装 Docker、拉代码、启动全套服务）：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ziyisj/cardshop/main/bootstrap.sh | bash
+```
+
+- 自定义端口：`curl -fsSL .../bootstrap.sh | APP_PORT=80 bash`
+- 完成后访问 `http://服务器IP:8080`（后台 `/admin`，默认 admin@example.com / admin123456）
+- 支持 Ubuntu/Debian、CentOS/RHEL/Fedora、Alpine
+- 再次执行同一命令即可**更新并重新部署**
+
+> 生产环境记得：登录后立即改默认密码、配置 HTTPS、放行端口。
 
 ---
 
