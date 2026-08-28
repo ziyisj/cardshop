@@ -1,0 +1,16 @@
+# 默认自动处理文本换行
+* text=auto eol=lf
+
+# Shell 脚本与容器入口必须使用 LF，否则在 Linux 容器内无法执行
+*.sh        text eol=lf
+docker/entrypoint.sh text eol=lf
+
+# Windows 批处理/PS1 保持 CRLF
+*.ps1       text eol=crlf
+*.bat       text eol=crlf
+*.cmd       text eol=crlf
+
+# 二进制文件不做转换
+*.png       binary
+*.jpg       binary
+*.ico       binary

@@ -1,0 +1,79 @@
+# ============================================================================
+# CardShop 一键部署（跨平台：Windows / Linux / macOS）
+#
+#   启动：  docker compose up -d --build
+#   查看：  http://localhost:8080         （前台）
+#           http://localhost:8080/admin   （后台）
+#   停止：  docker compose down
+#   清库：  docker compose down -v
+# ============================================================================
+version: "3.8"
+
+services:
+  # PHP-FPM 应用
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: cardshop-app
+    restart: unless-stopped
+    environment:
+      DB_CONNECTION: mysql
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_DATABASE: ${DB_DATABASE:-cardshop}
+      DB_USERNAME: ${DB_USERNAME:-cardshop}
+      DB_PASSWORD: ${DB_PASSWORD:-cardshop_pass}
+      RUN_SEED: ${RUN_SEED:-true}
+    volumes:
+      - app_code:/var/www/html
+      - app_storage:/var/www/html/storage
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - cardshop
+
+  # Nginx 反向代理
+  web:
+    image: nginx:alpine
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-8080}:80"
+    volumes:
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - app_code:/var/www/html:ro
+    depends_on:
+      - app
+    networks:
+      - cardshop
+
+  # MySQL 数据库
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE:-cardshop}
+      MYSQL_USER: ${DB_USERNAME:-cardshop}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-cardshop_pass}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root_pass}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    ports:
+      - "${DB_EXPOSE_PORT:-33060}:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${DB_ROOT_PASSWORD:-root_pass}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks:
+      - cardshop
+
+volumes:
+  mysql_data:
+  app_storage:
+  app_code:
+
+networks:
+  cardshop:
+    driver: bridge

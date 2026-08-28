@@ -1,0 +1,14 @@
+.git
+.gitignore
+vendor
+node_modules
+storage/logs/*.log
+storage/framework/cache/data/*
+storage/framework/sessions/*
+storage/framework/views/*
+.env
+.env.backup
+*.md
+!README.md
+client-example/*.o
+client-example/license_client
