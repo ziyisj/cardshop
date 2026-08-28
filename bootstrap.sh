@@ -23,6 +23,9 @@ REPO_URL="${REPO_URL:-https://github.com/ziyisj/cardshop.git}"
 INSTALL_DIR="${INSTALL_DIR:-/opt/cardshop}"
 APP_PORT="${APP_PORT:-8080}"
 BRANCH="${BRANCH:-main}"
+# 设置 DOMAIN 即启用自动 HTTPS（Let's Encrypt，通过 Caddy）
+DOMAIN="${DOMAIN:-}"
+ACME_EMAIL="${ACME_EMAIL:-}"
 
 GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; NC='\033[0m'
 info()  { echo -e "${GREEN}[+]${NC} $1"; }
@@ -106,30 +109,64 @@ rand() { head -c 48 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 40; }
 
 if [ ! -f .env ]; then
     $SUDO cp .env.example .env
-    # 写入随机的授权签名密钥与数据库密码
-    HMAC="$(rand)"; SIGN="$(rand)"; DBPASS="$(rand)"
+    # 写入随机的授权签名密钥
+    HMAC="$(rand)"; SIGN="$(rand)"
     $SUDO sed -i "s|^LICENSE_HMAC_SECRET=.*|LICENSE_HMAC_SECRET=${HMAC}|" .env
     $SUDO sed -i "s|^LICENSE_SIGN_SECRET=.*|LICENSE_SIGN_SECRET=${SIGN}|" .env
+    # 设置 APP_URL（HTTPS 域名 或 http://IP:端口）
+    if [ -n "$DOMAIN" ]; then
+        $SUDO sed -i "s|^APP_URL=.*|APP_URL=https://${DOMAIN}|" .env
+    fi
     info "已生成 .env（含随机 LICENSE 密钥）"
-    warn "数据库密码将通过 compose 传入，如需自定义可编辑 $INSTALL_DIR/.env"
+    warn "如需自定义配置可编辑 $INSTALL_DIR/.env"
+fi
+
+# 无论是否新建 .env，只要提供了 DOMAIN 就同步 APP_URL（便于从 HTTP 切到 HTTPS）
+if [ -n "$DOMAIN" ] && [ -f .env ]; then
+    $SUDO sed -i "s|^APP_URL=.*|APP_URL=https://${DOMAIN}|" .env
 fi
 
 # ---------- 5. 启动 ----------
-info "构建并启动容器（首次较慢，请耐心等待）..."
-export APP_PORT
-$SUDO -E env APP_PORT="$APP_PORT" $DC up -d --build
+if [ -n "$DOMAIN" ]; then
+    # ===== HTTPS 模式：Caddy 自动申请 Let's Encrypt 证书 =====
+    [ -z "$ACME_EMAIL" ] && ACME_EMAIL="admin@${DOMAIN}"
+    info "启用自动 HTTPS：域名 ${DOMAIN}，证书邮箱 ${ACME_EMAIL}"
+    warn "请确认：${DOMAIN} 已解析到本服务器公网 IP，且 80/443 端口已放行"
 
-# ---------- 6. 输出结果 ----------
-IP="$(curl -fsSL https://api.ipify.org 2>/dev/null || echo 'your-server-ip')"
-echo
-info "部署完成！"
-echo "    前台:  http://${IP}:${APP_PORT}"
-echo "    后台:  http://${IP}:${APP_PORT}/admin"
-echo "    默认管理员: admin@example.com / admin123456（请登录后立即修改）"
-echo
-echo "    安装目录: $INSTALL_DIR"
-echo "    查看日志: cd $INSTALL_DIR && $DC logs -f"
-echo "    停止服务: cd $INSTALL_DIR && $DC down"
-echo "    更新重部署: curl -fsSL ${REPO_URL%.git}/raw/${BRANCH}/bootstrap.sh | bash"
-echo
-warn "生产环境请务必：修改默认管理员密码、配置 HTTPS、检查防火墙放行端口 ${APP_PORT}"
+    COMPOSE_FILES="-f docker-compose.yml -f docker-compose.caddy.yml"
+    info "构建并启动容器（首次较慢，请耐心等待）..."
+    $SUDO -E env DOMAIN="$DOMAIN" ACME_EMAIL="$ACME_EMAIL" $DC $COMPOSE_FILES up -d --build
+
+    IP="$(curl -fsSL https://api.ipify.org 2>/dev/null || echo 'your-server-ip')"
+    echo
+    info "部署完成！（HTTPS 已启用，证书由 Caddy 自动申请与续期）"
+    echo "    前台:  https://${DOMAIN}"
+    echo "    后台:  https://${DOMAIN}/admin"
+    echo "    默认管理员: admin@example.com / admin123456（请登录后立即修改）"
+    echo
+    echo "    安装目录: $INSTALL_DIR"
+    echo "    查看日志: cd $INSTALL_DIR && $DC $COMPOSE_FILES logs -f"
+    echo "    停止服务: cd $INSTALL_DIR && $DC $COMPOSE_FILES down"
+    echo
+    warn "若浏览器暂时打不开 https，请等待 30~60 秒让 Caddy 完成证书申请"
+    warn "证书申请失败多半是：域名未解析、80/443 未放行、或触发 LE 速率限制"
+else
+    # ===== HTTP 模式：直接暴露 APP_PORT =====
+    info "构建并启动容器（首次较慢，请耐心等待）..."
+    $SUDO -E env APP_PORT="$APP_PORT" $DC up -d --build
+
+    IP="$(curl -fsSL https://api.ipify.org 2>/dev/null || echo 'your-server-ip')"
+    echo
+    info "部署完成！"
+    echo "    前台:  http://${IP}:${APP_PORT}"
+    echo "    后台:  http://${IP}:${APP_PORT}/admin"
+    echo "    默认管理员: admin@example.com / admin123456（请登录后立即修改）"
+    echo
+    echo "    安装目录: $INSTALL_DIR"
+    echo "    查看日志: cd $INSTALL_DIR && $DC logs -f"
+    echo "    停止服务: cd $INSTALL_DIR && $DC down"
+    echo
+    warn "想启用 HTTPS？带上域名重新部署："
+    echo "    curl -fsSL ${REPO_URL%.git}/raw/${BRANCH}/bootstrap.sh | DOMAIN=your.domain.com bash"
+    warn "生产环境请务必：修改默认管理员密码、检查防火墙放行端口"
+fi

@@ -22,7 +22,29 @@ curl -fsSL https://raw.githubusercontent.com/ziyisj/cardshop/main/bootstrap.sh |
 - 支持 Ubuntu/Debian、CentOS/RHEL/Fedora、Alpine
 - 再次执行同一命令即可**更新并重新部署**
 
-> 生产环境记得：登录后立即改默认密码、配置 HTTPS、放行端口。
+### 带域名 + 自动 HTTPS（一行搞定证书）
+
+只要**带上 `DOMAIN`**，脚本会自动用 Caddy 申请 Let's Encrypt 证书并自动续期：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ziyisj/cardshop/main/bootstrap.sh | DOMAIN=shop.example.com bash
+```
+
+可选指定证书通知邮箱：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ziyisj/cardshop/main/bootstrap.sh | DOMAIN=shop.example.com ACME_EMAIL=you@example.com bash
+```
+
+**前提**（否则证书申请会失败）：
+1. 域名 `shop.example.com` 已解析（A 记录）到本服务器公网 IP
+2. 服务器 **80 和 443** 端口对外放行（云服务器安全组 + 系统防火墙）
+
+完成后访问 `https://shop.example.com`。证书由 Caddy 全自动申请与续期，无需手动维护。
+
+> 从 HTTP 切到 HTTPS：带上 `DOMAIN` 再次执行同一命令即可，脚本会自动切换。
+
+> 生产环境记得：登录后立即改默认密码。
 
 ---
 

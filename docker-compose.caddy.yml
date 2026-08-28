@@ -1,0 +1,41 @@
+# ============================================================================
+# Caddy 叠加配置：启用自动 HTTPS（Let's Encrypt）
+#
+# 与主 compose 一起使用：
+#   docker compose -f docker-compose.yml -f docker-compose.caddy.yml up -d --build
+#
+# 需设置环境变量：
+#   DOMAIN       你的域名（已解析到本机公网 IP）
+#   ACME_EMAIL   证书通知邮箱
+#
+# 说明：
+#   - 覆盖 web(nginx) 服务：不再直接对外暴露端口，仅供 Caddy 内部访问
+#   - 新增 caddy 服务：对外暴露 80/443，自动申请与续期证书
+# ============================================================================
+services:
+  # 覆盖主文件里的 web 服务：移除对外端口映射（改由 Caddy 入口）
+  web:
+    ports: []
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"     # HTTP/3
+    environment:
+      DOMAIN: ${DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL:-admin@${DOMAIN}}
+    volumes:
+      - ./docker/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data       # 证书持久化（重要，避免重复申请触发速率限制）
+      - caddy_config:/config
+    depends_on:
+      - web
+    networks:
+      - cardshop
+
+volumes:
+  caddy_data:
+  caddy_config:
